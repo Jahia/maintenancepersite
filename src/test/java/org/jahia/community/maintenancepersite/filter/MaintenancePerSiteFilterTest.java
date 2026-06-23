@@ -16,6 +16,7 @@ import org.mockito.MockitoAnnotations;
 import javax.servlet.http.HttpServletResponse;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,11 +82,13 @@ public class MaintenancePerSiteFilterTest {
         when(maintenanceProperty.getNode()).thenReturn(maintenancePage);
         when(maintenancePage.getPath()).thenReturn(MAINTENANCE_PATH);
         when(resource.getNodePath()).thenReturn(MAINTENANCE_PATH);
+        // Wire the response so the never() guard below would actually catch an erroneous redirect.
+        when(renderContext.getResponse()).thenReturn(response);
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
         assertEquals(PREVIOUS_OUT, result);
-        verify(response, never()).sendRedirect(MAINTENANCE_URL);
+        verify(response, never()).sendRedirect(anyString());
     }
 
     @Test
@@ -94,21 +97,23 @@ public class MaintenancePerSiteFilterTest {
         when(resource.getNode()).thenReturn(resourceNode);
         when(resourceNode.getResolveSite()).thenReturn(site);
         when(site.isNodeType("jmix:maintenancePerSite")).thenReturn(false);
+        when(renderContext.getResponse()).thenReturn(response);
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
         assertEquals(PREVIOUS_OUT, result);
-        verify(response, never()).sendRedirect(MAINTENANCE_URL);
+        verify(response, never()).sendRedirect(anyString());
     }
 
     @Test
     public void execute_nonLiveWorkspace_noRedirectReturnsOutput() throws Exception {
         when(renderContext.getWorkspace()).thenReturn(Constants.EDIT_WORKSPACE);
+        when(renderContext.getResponse()).thenReturn(response);
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
         assertEquals(PREVIOUS_OUT, result);
-        verify(response, never()).sendRedirect(MAINTENANCE_URL);
+        verify(response, never()).sendRedirect(anyString());
     }
 
     @After
