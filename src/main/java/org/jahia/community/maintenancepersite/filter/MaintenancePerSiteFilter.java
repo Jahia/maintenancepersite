@@ -2,6 +2,7 @@ package org.jahia.community.maintenancepersite.filter;
 
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.PathNotFoundException;
+import javax.jcr.RepositoryException;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jahia.api.Constants;
@@ -30,14 +31,17 @@ import org.slf4j.LoggerFactory;
  * the mixin is removed.</p>
  *
  * <p>The filter fails open: any misconfiguration (missing or dangling {@code maintenancePage}
- * reference) is logged and normal output is returned, so a bad setting never takes the whole site
- * down with a 500.</p>
+ * reference), repository/ACL error while resolving the site, or failure rendering the maintenance
+ * page is logged and normal output is returned, so a bad setting never takes the whole site down
+ * with a 500.</p>
  */
 @Component(service = RenderFilter.class)
 public class MaintenancePerSiteFilter extends AbstractFilter {
 
     private static final Logger log = LoggerFactory.getLogger(MaintenancePerSiteFilter.class);
 
+    // Package-private (not private) so the unit test can reference these directly instead of
+    // duplicating the literals.
     static final String MIXIN_MAINTENANCE = "jmix:maintenancePerSite";
     static final String PROP_MAINTENANCE_PAGE = "maintenancePage";
 
@@ -65,8 +69,16 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
             return output;
         }
 
-        JCRSiteNode site = resource.getNode().getResolveSite();
-        if (!site.isNodeType(MIXIN_MAINTENANCE)) {
+        JCRSiteNode site;
+        try {
+            site = resource.getNode().getResolveSite();
+            if (!site.isNodeType(MIXIN_MAINTENANCE)) {
+                return output;
+            }
+        } catch (RepositoryException e) {
+            // Fail open: a repository/ACL error while resolving the site must not turn into a 500.
+            log.error("Error resolving site or checking the {} mixin for resource {}; serving normal output.",
+                    MIXIN_MAINTENANCE, resource.getNodePath(), e);
             return output;
         }
 
@@ -133,7 +145,7 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
             log.warn("The {} reference on site {} does not resolve to a page; serving normal output.",
                     PROP_MAINTENANCE_PAGE, site.getName(), e);
             return null;
-        } catch (javax.jcr.RepositoryException e) {
+        } catch (RepositoryException e) {
             log.error("Error resolving the {} property on site {}; serving normal output.",
                     PROP_MAINTENANCE_PAGE, site.getName(), e);
             return null;

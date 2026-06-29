@@ -15,6 +15,7 @@ import org.mockito.MockitoAnnotations;
 
 import javax.jcr.AccessDeniedException;
 import javax.jcr.PathNotFoundException;
+import javax.jcr.RepositoryException;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jahia.services.render.RenderException;
@@ -112,6 +113,7 @@ public class MaintenancePerSiteFilterTest {
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
         assertEquals(PREVIOUS_OUT, result);
+        verify(renderContext, never()).getResponse();
         verify(response, never()).setStatus(anyInt());
     }
 
@@ -135,6 +137,19 @@ public class MaintenancePerSiteFilterTest {
         wireLiveSiteWithMixin(true);
         wireResolvedMaintenancePage();
         when(resource.getNodePath()).thenReturn(MAINTENANCE_PATH);
+
+        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+
+        assertEquals(PREVIOUS_OUT, result);
+        verify(filter, never()).renderMaintenancePage(any(), any(), any());
+        verify(response, never()).setStatus(anyInt());
+    }
+
+    @Test
+    public void execute_siteResolutionThrowsRepositoryException_failsOpen() throws Exception {
+        when(renderContext.getWorkspace()).thenReturn(Constants.LIVE_WORKSPACE);
+        when(resource.getNode()).thenReturn(resourceNode);
+        when(resourceNode.getResolveSite()).thenThrow(new RepositoryException("repo down"));
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
