@@ -11,6 +11,9 @@
 # Maven
 target
 
+# Compiled class files (stray, outside target/)
+*.class
+
 # Jahia DX Studio
 repository.xml.generated
 
