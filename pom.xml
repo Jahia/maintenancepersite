@@ -78,6 +78,11 @@
             <version>5.12.0</version>
             <scope>test</scope>
         </dependency>
+        <!--
+          Required on the TEST classpath so Mockito's inline mock-maker can load and mock
+          org.jahia.services.render.Resource, whose type graph references Guava. Not imported
+          directly by any test, but removing it breaks mocking of Resource.
+        -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>

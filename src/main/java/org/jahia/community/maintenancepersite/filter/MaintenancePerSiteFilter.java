@@ -39,10 +39,13 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
     private static final Logger log = LoggerFactory.getLogger(MaintenancePerSiteFilter.class);
 
     static final String MIXIN_MAINTENANCE = "jmix:maintenancePerSite";
-    private static final String PROP_MAINTENANCE_PAGE = "maintenancePage";
+    static final String PROP_MAINTENANCE_PAGE = "maintenancePage";
 
     /** Advisory delay (seconds) sent in the {@code Retry-After} header of the 503 response. */
-    private static final int RETRY_AFTER_SECONDS = 3600;
+    static final int RETRY_AFTER_SECONDS = 3600;
+
+    // no-store alone is sufficient per RFC 7234; no-cache + must-revalidate are belt-and-suspenders
+    // for legacy intermediaries that mishandle no-store.
     private static final String NO_STORE_CACHE_CONTROL = "no-store, no-cache, must-revalidate";
 
     @Activate
@@ -74,6 +77,9 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
         }
 
         // The maintenance page itself must stay reachable, otherwise it would 503 itself in a loop.
+        // Loop safety: when renderMaintenancePage() below re-enters the render chain (and therefore
+        // this filter) for the maintenance page, resource.getNodePath() equals maintenancePage.getPath()
+        // because the nested Resource wraps the same JCR node, so this guard terminates the recursion.
         if (resource.getNodePath().equals(maintenancePage.getPath())) {
             return output;
         }
@@ -81,9 +87,24 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
         log.debug("Site {} is in maintenance; serving maintenance page {} with HTTP 503.",
                 site.getName(), maintenancePage.getPath());
 
-        String maintenanceHtml = renderMaintenancePage(maintenancePage, renderContext, resource);
+        String maintenanceHtml;
+        try {
+            maintenanceHtml = renderMaintenancePage(maintenancePage, renderContext, resource);
+        } catch (RenderException e) {
+            // Fail open: a broken or unrenderable maintenance page must not turn into a 500.
+            log.error("Failed to render maintenance page {} for site {}; serving normal output.",
+                    maintenancePage.getPath(), site.getName(), e);
+            return output;
+        }
 
+        // Stamp the 503 only after a successful render, so a render failure leaves the normal 200
+        // output untouched. Guarded by isCommitted() in case a nested filter already flushed the response.
         HttpServletResponse response = renderContext.getResponse();
+        if (response.isCommitted()) {
+            log.warn("Response already committed while serving maintenance page {}; 503 status/headers not applied.",
+                    maintenancePage.getPath());
+            return maintenanceHtml;
+        }
         response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         response.setHeader("Retry-After", String.valueOf(RETRY_AFTER_SECONDS));
         response.setHeader("Cache-Control", NO_STORE_CACHE_CONTROL);
@@ -122,6 +143,11 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
     /**
      * Renders the maintenance page body. Package-private seam so unit tests can stub the render
      * without standing up a full Jahia render engine.
+     *
+     * <p>Uses {@link RenderService#getInstance()} (the established Jahia access pattern) rather than an
+     * OSGi {@code @Reference}: {@code RenderService} is a Spring-managed singleton, not a published OSGi
+     * service, so an {@code @Reference} would leave this component permanently unsatisfied and never
+     * activated. The singleton is non-null and fully initialised by the time a live page is rendered.</p>
      */
     String renderMaintenancePage(JCRNodeWrapper maintenancePage, RenderContext renderContext, Resource currentResource) throws RenderException {
         Resource maintenanceResource = new Resource(maintenancePage, currentResource.getTemplateType(), null, Resource.CONFIGURATION_PAGE);

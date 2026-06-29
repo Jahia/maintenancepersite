@@ -13,13 +13,17 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import javax.jcr.AccessDeniedException;
 import javax.jcr.PathNotFoundException;
 import javax.servlet.http.HttpServletResponse;
+
+import org.jahia.services.render.RenderException;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -74,8 +78,8 @@ public class MaintenancePerSiteFilterTest {
     }
 
     private void wireResolvedMaintenancePage() throws Exception {
-        when(site.hasProperty("maintenancePage")).thenReturn(true);
-        when(site.getProperty("maintenancePage")).thenReturn(maintenanceProperty);
+        when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
+        when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(maintenanceProperty);
         when(maintenanceProperty.getNode()).thenReturn(maintenancePage);
         when(maintenancePage.getPath()).thenReturn(MAINTENANCE_PATH);
     }
@@ -92,9 +96,38 @@ public class MaintenancePerSiteFilterTest {
 
         assertEquals(MAINTENANCE_HTML, result);
         verify(response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-        verify(response).setHeader("Retry-After", "3600");
+        verify(response).setHeader("Retry-After", String.valueOf(MaintenancePerSiteFilter.RETRY_AFTER_SECONDS));
         verify(response).setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         verify(response).setHeader("Pragma", "no-cache");
+    }
+
+    @Test
+    public void execute_maintenancePageRenderFails_failsOpen() throws Exception {
+        wireLiveSiteWithMixin(true);
+        wireResolvedMaintenancePage();
+        when(resource.getNodePath()).thenReturn(OTHER_PATH);
+        doThrow(new RenderException("no view")).when(filter)
+                .renderMaintenancePage(maintenancePage, renderContext, resource);
+
+        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+
+        assertEquals(PREVIOUS_OUT, result);
+        verify(response, never()).setStatus(anyInt());
+    }
+
+    @Test
+    public void execute_responseAlreadyCommitted_servesBodyWithout503() throws Exception {
+        wireLiveSiteWithMixin(true);
+        wireResolvedMaintenancePage();
+        when(resource.getNodePath()).thenReturn(OTHER_PATH);
+        when(renderContext.getResponse()).thenReturn(response);
+        when(response.isCommitted()).thenReturn(true);
+        doReturn(MAINTENANCE_HTML).when(filter).renderMaintenancePage(maintenancePage, renderContext, resource);
+
+        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+
+        assertEquals(MAINTENANCE_HTML, result);
+        verify(response, never()).setStatus(anyInt());
     }
 
     @Test
@@ -135,7 +168,7 @@ public class MaintenancePerSiteFilterTest {
     @Test
     public void execute_mixinButMaintenancePagePropertyNotSet_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
-        when(site.hasProperty("maintenancePage")).thenReturn(false);
+        when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(false);
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
@@ -147,8 +180,21 @@ public class MaintenancePerSiteFilterTest {
     @Test
     public void execute_mixinButMaintenancePageReferenceUnresolved_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
-        when(site.hasProperty("maintenancePage")).thenReturn(true);
-        when(site.getProperty("maintenancePage")).thenThrow(new PathNotFoundException("gone"));
+        when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
+        when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenThrow(new PathNotFoundException("gone"));
+
+        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+
+        assertEquals(PREVIOUS_OUT, result);
+        verify(filter, never()).renderMaintenancePage(any(), any(), any());
+        verify(response, never()).setStatus(anyInt());
+    }
+
+    @Test
+    public void execute_mixinButRepositoryErrorResolvingPage_failsOpen() throws Exception {
+        wireLiveSiteWithMixin(true);
+        when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
+        when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenThrow(new AccessDeniedException("acl"));
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
 
@@ -160,8 +206,8 @@ public class MaintenancePerSiteFilterTest {
     @Test
     public void execute_mixinButMaintenancePageNodeNull_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
-        when(site.hasProperty("maintenancePage")).thenReturn(true);
-        when(site.getProperty("maintenancePage")).thenReturn(maintenanceProperty);
+        when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
+        when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(maintenanceProperty);
         when(maintenanceProperty.getNode()).thenReturn(null);
 
         String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
