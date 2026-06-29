@@ -87,8 +87,9 @@
     </dependencies>
 
     <scm>
-        <connection>scm:dummy:uri</connection>
-        <developerConnection>scm:dummy:uri</developerConnection>
+        <connection>scm:git:https://github.com/Jahia/maintenancepersite.git</connection>
+        <developerConnection>scm:git:https://github.com/Jahia/maintenancepersite.git</developerConnection>
+        <url>https://github.com/Jahia/maintenancepersite</url>
     </scm>
 
     <repositories>
