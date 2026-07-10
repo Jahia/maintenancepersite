@@ -1,0 +1,9 @@
+mutation setMaintenancePage($pathOrId: String!, $value: String!) {
+    jcr(workspace: EDIT) {
+        mutateNode(pathOrId: $pathOrId) {
+            mutateProperty(name: "maintenancePage") {
+                setValue(value: $value, type: WEAKREFERENCE)
+            }
+        }
+    }
+}

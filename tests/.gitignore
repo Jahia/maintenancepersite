@@ -1,0 +1,7 @@
+node_modules
+results
+run-artifacts
+artifacts
+.env
+cypress/videos
+coverage

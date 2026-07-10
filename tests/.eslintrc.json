@@ -1,0 +1,12 @@
+{
+	"extends": ["@jahia", "plugin:cypress/recommended", "plugin:@typescript-eslint/recommended", "plugin:prettier/recommended"],
+	"plugins": ["cypress", "@typescript-eslint", "chai-friendly"],
+	"parser": "@typescript-eslint/parser",
+	"rules": {
+		"max-nested-callbacks": "off",
+		"max-params": "off",
+		"@typescript-eslint/no-unused-expressions": "off",
+		"chai-friendly/no-unused-expressions": "error"
+	},
+	"root": true
+}
