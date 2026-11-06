@@ -30,5 +30,12 @@
 		"mochawesome-report-generator": "^6.2.0",
 		"prettier": "^3.6.2",
 		"typescript": "^5.8.3"
+	},
+	"resolutions": {
+		"baseline-browser-mapping": "^2.11.22",
+		"browserslist": "^4.28.9",
+		"js-yaml": "^4.3.2",
+		"qs": "^6.16.1",
+		"uuid": "^11.1.1"
 	}
 }
