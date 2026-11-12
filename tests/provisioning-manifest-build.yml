@@ -1,3 +1,20 @@
-# No extra modules needed: dx-base-demo-templates ships with the Jahia dev image,
-# and the maintenancepersite bundle itself is deployed from ./artifacts by env.provision.sh.
-[]
+# The e2e spec creates its test site with the dx-base-demo-templates template set, which the
+# Jahia image does not ship. Install it from the Jahia Store with the dependencies the image
+# lacks, dependencies first (default, search, facets, profile, seo, jquery and
+# legacy-default-components already ship with the image).
+# The maintenancepersite bundle itself is deployed from ./artifacts by env.provision.sh.
+- installBundle:
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/skins/8.2.0/skins-8.2.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/default-skins/8.2.0/default-skins-8.2.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/grid/8.1.0/grid-8.1.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/bookmarks/3.1.0/bookmarks-3.1.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/topstories/3.0.0/topstories-3.0.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/calendar/3.2.0/calendar-3.2.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/rating/3.3.0/rating-3.3.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/location/3.2.0/location-3.2.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/news/3.4.0/news-3.4.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/bootstrap3-core/4.3.0/bootstrap3-core-4.3.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/bootstrap3-components/4.3.0/bootstrap3-components-4.3.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/dx-base-demo-core/2.6.0/dx-base-demo-core-2.6.0.jar'
+    - 'https://store.jahia.com/modules/mavenproxy/store/org/jahia/modules/dx-base-demo-templates/4.0.0/dx-base-demo-templates-4.0.0.jar'
+  autoStart: true
