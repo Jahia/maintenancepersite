@@ -11,6 +11,9 @@ import {
 const siteKey = 'maintenancepersite-test'
 const MODULE_NAME = 'maintenancepersite'
 const MAINTENANCE_PAGE_TITLE = 'Site under maintenance'
+// The title also appears in the site navigation of every page, so match the page's own <title>:
+// it proves the maintenance page itself was rendered, with its page template.
+const MAINTENANCE_PAGE_TITLE_TAG = new RegExp(`<title>\\s*${MAINTENANCE_PAGE_TITLE}\\s*</title>`)
 
 describe('Maintenance per site', () => {
     let maintenancePageUuid: string
@@ -46,6 +49,8 @@ describe('Maintenance per site', () => {
         cy.request(`/sites/${siteKey}/home.html`).its('status').should('eq', 200)
     })
 
+    // Keep this test before the direct request below: it then renders the maintenance page for the first
+    // time, not from the HTML cache, which is the case where a nested render after the page came out empty.
     it('serves a 503 with the maintenance page once jmix:maintenancePerSite is enabled', () => {
         cy.login()
         addMixins(`/sites/${siteKey}`, ['jmix:maintenancePerSite'])
@@ -60,14 +65,14 @@ describe('Maintenance per site', () => {
             expect(response.status).to.eq(503)
             expect(response.headers['retry-after']).to.exist
             expect(response.headers['cache-control']).to.contain('no-store')
-            expect(response.body).to.contain(MAINTENANCE_PAGE_TITLE)
+            expect(response.body).to.match(MAINTENANCE_PAGE_TITLE_TAG)
         })
     })
 
     it('keeps the maintenance page itself reachable (no redirect loop)', () => {
         cy.request(`/sites/${siteKey}/home/maintenance.html`).then((response) => {
             expect(response.status).to.eq(200)
-            expect(response.body).to.contain(MAINTENANCE_PAGE_TITLE)
+            expect(response.body).to.match(MAINTENANCE_PAGE_TITLE_TAG)
         })
     })
 
