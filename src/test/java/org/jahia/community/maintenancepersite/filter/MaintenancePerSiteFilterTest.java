@@ -18,12 +18,12 @@ import org.mockito.MockitoAnnotations;
 import javax.jcr.AccessDeniedException;
 import javax.jcr.PathNotFoundException;
 import javax.jcr.RepositoryException;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jahia.services.render.RenderException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -32,14 +32,12 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class MaintenancePerSiteFilterTest {
 
-    private static final String PREVIOUS_OUT = "normal-output";
     private static final String MAINTENANCE_HTML = "<html><body>Under maintenance</body></html>";
     private static final String MAINTENANCE_PATH = "/sites/mySite/home/maintenance";
     private static final String OTHER_PATH = "/sites/mySite/home";
@@ -61,8 +59,6 @@ public class MaintenancePerSiteFilterTest {
     private JCRPropertyWrapper maintenanceProperty;
     @Mock
     private HttpServletResponse response;
-    @Mock
-    private HttpServletRequest request;
 
     private MaintenancePerSiteFilter filter;
     private AutoCloseable mocks;
@@ -95,14 +91,14 @@ public class MaintenancePerSiteFilterTest {
     }
 
     @Test
-    public void execute_liveSiteInMaintenance_servesMaintenancePageWith503() throws Exception {
+    public void prepare_liveSiteInMaintenance_servesMaintenancePageWith503() throws Exception {
         wireLiveSiteWithMixin(true);
         wireResolvedMaintenancePage();
         when(resource.getNodePath()).thenReturn(OTHER_PATH);
         when(renderContext.getResponse()).thenReturn(response);
         doReturn(MAINTENANCE_HTML).when(filter).renderMaintenancePage(maintenancePage, renderContext, resource);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
         assertEquals(MAINTENANCE_HTML, result);
         verify(response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
@@ -115,23 +111,23 @@ public class MaintenancePerSiteFilterTest {
     }
 
     @Test
-    public void execute_maintenancePageRenderFails_failsOpen() throws Exception {
+    public void prepare_maintenancePageRenderFails_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
         wireResolvedMaintenancePage();
         when(resource.getNodePath()).thenReturn(OTHER_PATH);
         doThrow(new RenderException("no view")).when(filter)
                 .renderMaintenancePage(maintenancePage, renderContext, resource);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(renderContext, never()).getResponse();
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_responseAlreadyCommitted_servesBodyWithout503() throws Exception {
+    public void prepare_responseAlreadyCommitted_servesBodyWithout503() throws Exception {
         wireLiveSiteWithMixin(true);
         wireResolvedMaintenancePage();
         when(resource.getNodePath()).thenReturn(OTHER_PATH);
@@ -139,7 +135,7 @@ public class MaintenancePerSiteFilterTest {
         when(response.isCommitted()).thenReturn(true);
         doReturn(MAINTENANCE_HTML).when(filter).renderMaintenancePage(maintenancePage, renderContext, resource);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
         assertEquals(MAINTENANCE_HTML, result);
         verify(response, never()).setStatus(anyInt());
@@ -147,108 +143,108 @@ public class MaintenancePerSiteFilterTest {
     }
 
     @Test
-    public void execute_requestForMaintenancePageItself_returnsOutputNo503() throws Exception {
+    public void prepare_requestForMaintenancePageItself_returnsOutputNo503() throws Exception {
         wireLiveSiteWithMixin(true);
         wireResolvedMaintenancePage();
         when(resource.getNodePath()).thenReturn(MAINTENANCE_PATH);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_siteResolutionThrowsRepositoryException_failsOpen() throws Exception {
+    public void prepare_siteResolutionThrowsRepositoryException_failsOpen() throws Exception {
         when(renderContext.getWorkspace()).thenReturn(Constants.LIVE_WORKSPACE);
         when(resource.getNode()).thenReturn(resourceNode);
         when(resourceNode.getResolveSite()).thenThrow(new RepositoryException("repo down"));
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_siteWithoutMixin_returnsOutput() throws Exception {
+    public void prepare_siteWithoutMixin_returnsOutput() throws Exception {
         wireLiveSiteWithMixin(false);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_nonLiveWorkspace_returnsOutput() throws Exception {
+    public void prepare_nonLiveWorkspace_returnsOutput() throws Exception {
         when(renderContext.getWorkspace()).thenReturn(Constants.EDIT_WORKSPACE);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_mixinButMaintenancePagePropertyNotSet_failsOpen() throws Exception {
+    public void prepare_mixinButMaintenancePagePropertyNotSet_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
         when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(false);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_mixinButMaintenancePageReferenceUnresolved_failsOpen() throws Exception {
+    public void prepare_mixinButMaintenancePageReferenceUnresolved_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
         when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
         when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenThrow(new PathNotFoundException("gone"));
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_mixinButRepositoryErrorResolvingPage_failsOpen() throws Exception {
+    public void prepare_mixinButRepositoryErrorResolvingPage_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
         when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
         when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenThrow(new AccessDeniedException("acl"));
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
-    public void execute_mixinButMaintenancePageNodeNull_failsOpen() throws Exception {
+    public void prepare_mixinButMaintenancePageNodeNull_failsOpen() throws Exception {
         wireLiveSiteWithMixin(true);
         when(site.hasProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(true);
         when(site.getProperty(MaintenancePerSiteFilter.PROP_MAINTENANCE_PAGE)).thenReturn(maintenanceProperty);
         when(maintenanceProperty.getNode()).thenReturn(null);
 
-        String result = filter.execute(PREVIOUS_OUT, renderContext, resource, chain);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        assertEquals(PREVIOUS_OUT, result);
+        assertNull(result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
@@ -258,7 +254,6 @@ public class MaintenancePerSiteFilterTest {
     public void renderMaintenancePage_rendersItAsMainResourceThenRestoresPrevious() throws Exception {
         Resource previousMain = resource;
         when(renderContext.getMainResource()).thenReturn(previousMain);
-        when(renderContext.getRequest()).thenReturn(request);
         when(resource.getTemplateType()).thenReturn("html");
         doReturn(MAINTENANCE_HTML).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
 
@@ -274,32 +269,33 @@ public class MaintenancePerSiteFilterTest {
     }
 
     @Test
-    public void renderMaintenancePage_startsFromACleanTemplateStateThenRestoresIt() throws Exception {
-        when(renderContext.getMainResource()).thenReturn(resource);
-        when(renderContext.getRequest()).thenReturn(request);
-        when(resource.getTemplateType()).thenReturn("html");
-        // Left by the page's own render: TemplateNodeFilter skips template resolution while it is set,
-        // so the maintenance page would render without its page template, i.e. an empty body.
-        when(request.getAttribute("templateSet")).thenReturn(Boolean.TRUE);
-        doReturn(MAINTENANCE_HTML).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
+    public void prepare_maintenancePageRendersNull_failsOpen() throws Exception {
+        wireLiveSiteWithMixin(true);
+        wireResolvedMaintenancePage();
+        when(resource.getNodePath()).thenReturn(OTHER_PATH);
+        doReturn(null).when(filter).renderMaintenancePage(maintenancePage, renderContext, resource);
 
-        filter.renderMaintenancePage(maintenancePage, renderContext, resource);
+        String result = filter.prepare(renderContext, resource, chain);
 
-        InOrder order = inOrder(request, filter);
-        order.verify(request).removeAttribute("templateSet");
-        order.verify(filter).renderResource(any(Resource.class), any(RenderContext.class));
-        order.verify(request).setAttribute("templateSet", Boolean.TRUE);
-        // Unset before the render: cleared again afterwards, dropping what the nested render left.
-        verify(request, times(2)).removeAttribute("previousTemplate");
-        verify(request, never()).setAttribute(org.mockito.ArgumentMatchers.eq("previousTemplate"), any());
+        // null lets the chain render the requested page normally: it must not get a 503 status.
+        assertNull(result);
+        verify(renderContext, never()).getResponse();
+        verify(renderContext, never()).computeClientCachePolicy(any());
+    }
+
+    @Test
+    public void execute_passesThePreparedMaintenanceBodyThrough() throws Exception {
+        // When prepare() returns the maintenance body, RenderChain calls execute() on this filter with it.
+        String result = filter.execute(MAINTENANCE_HTML, renderContext, resource, chain);
+
+        assertEquals(MAINTENANCE_HTML, result);
+        verify(filter, never()).renderMaintenancePage(any(), any(), any());
     }
 
     @Test
     public void renderMaintenancePage_restoresPreviousMainResourceWhenRenderFails() throws Exception {
         Resource previousMain = resource;
         when(renderContext.getMainResource()).thenReturn(previousMain);
-        when(renderContext.getRequest()).thenReturn(request);
-        when(request.getAttribute("templateSet")).thenReturn(Boolean.TRUE);
         when(resource.getTemplateType()).thenReturn("html");
         doThrow(new RenderException("no view")).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
 
@@ -311,7 +307,6 @@ public class MaintenancePerSiteFilterTest {
         }
 
         verify(renderContext).setMainResource(previousMain);
-        verify(request).setAttribute("templateSet", Boolean.TRUE);
     }
 
     @Test

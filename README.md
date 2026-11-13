@@ -11,7 +11,8 @@ The module ships the `jmix:maintenancePerSite` mixin (extending
 A render filter (`MaintenancePerSiteFilter`) runs on the **live** workspace
 only: when the resolved site carries the mixin, every HTML page request is
 served the configured maintenance page's content — except the maintenance page
-itself, so it stays reachable.
+itself, so it stays reachable. The filter renders the maintenance page in place
+of the requested page, which is not rendered at all.
 
 The maintenance response uses **HTTP 503** (not a 302 redirect) with
 `Retry-After` and `Cache-Control: no-store` headers, so:

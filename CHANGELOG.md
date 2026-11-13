@@ -12,6 +12,13 @@ All notable changes to the Maintenance Per Site module are documented in this fi
   context policy and ignores the module's own header in strict mode. The filter now calls
   `renderContext.computeClientCachePolicy(ClientCachePolicy.PRIVATE)`, which yields Jahia's
   `private, no-cache, no-store, ...` template.
+- The 503 maintenance response had an empty body, and requesting the maintenance page directly
+  afterwards returned that empty body too. The filter rendered the maintenance page after the
+  requested page, on the same request; Jahia's page render leaves request attributes behind
+  (`templateSet`, `skipWrapper`) that make a second page render skip its page template, and the
+  empty result was stored in the HTML cache under the maintenance page. The filter now renders the
+  maintenance page before the requested page, as the main resource, and the requested page is not
+  rendered at all.
 
 ### Changed
 - **Requires Jahia 8.2.3.7 or later** (parent `jahia-modules` 8.2.3.7): the client cache policy
