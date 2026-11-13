@@ -1,8 +1,13 @@
 package org.jahia.community.maintenancepersite.filter;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.PathNotFoundException;
 import javax.jcr.RepositoryException;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jahia.api.Constants;
@@ -13,6 +18,7 @@ import org.jahia.services.render.RenderException;
 import org.jahia.services.render.RenderService;
 import org.jahia.services.render.Resource;
 import org.jahia.services.render.filter.AbstractFilter;
+import org.jahia.services.render.filter.AggregateFilter;
 import org.jahia.services.render.filter.RenderChain;
 import org.jahia.services.render.filter.RenderFilter;
 import org.jahia.services.render.filter.cache.ClientCachePolicy;
@@ -59,6 +65,14 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
     // no-store alone is sufficient per RFC 7234; no-cache + must-revalidate are belt-and-suspenders
     // for legacy intermediaries that mishandle no-store.
     private static final String NO_STORE_CACHE_CONTROL = "no-store, no-cache, must-revalidate";
+
+    /**
+     * Request attributes holding the state of a page render: TemplateNodeFilter's template chain and
+     * AggregateFilter's resource stack. They are cleared around the nested maintenance page render.
+     */
+    static final List<String> PAGE_RENDER_STATE_ATTRIBUTES = List.of(
+            "templateSet", "previousTemplate", "cachedTemplate", "currentTemplateNode", "wrappedResource",
+            AggregateFilter.RESOURCES_STACK);
 
     @Activate
     public void activate() {
@@ -178,14 +192,31 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
         Resource maintenanceResource = new Resource(maintenancePage, currentResource.getTemplateType(), null, Resource.CONFIGURATION_PAGE);
         // Render it as the main resource, the way Jahia renders a page (Render servlet, TemplateHelper):
         // AggregateCacheFilter resolves cache:include placeholders and strips cache tags only for the main
-        // resource. Rendered as a sub-resource, the result is an empty <!-- cache:include --> placeholder
-        // that nothing aggregates any more, since this filter runs after the page's own aggregation.
+        // resource, and page templates read renderContext.mainResource (title, navigation).
         Resource previousMainResource = renderContext.getMainResource();
+        HttpServletRequest request = renderContext.getRequest();
+        // The page's own render is already done on this request and left its template state behind:
+        // with "templateSet" still set, TemplateNodeFilter skips template resolution and the maintenance
+        // page renders without its page template (an empty body). Start from a clean state, as a new
+        // request would, and put the outer state back afterwards.
+        Map<String, Object> savedAttributes = new HashMap<>();
+        for (String name : PAGE_RENDER_STATE_ATTRIBUTES) {
+            savedAttributes.put(name, request.getAttribute(name));
+            request.removeAttribute(name);
+        }
         renderContext.setMainResource(maintenanceResource);
         try {
             return renderResource(maintenanceResource, renderContext);
         } finally {
             renderContext.setMainResource(previousMainResource);
+            for (String name : PAGE_RENDER_STATE_ATTRIBUTES) {
+                Object value = savedAttributes.get(name);
+                if (value == null) {
+                    request.removeAttribute(name);
+                } else {
+                    request.setAttribute(name, value);
+                }
+            }
         }
     }
 

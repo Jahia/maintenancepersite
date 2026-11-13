@@ -18,6 +18,7 @@ import org.mockito.MockitoAnnotations;
 import javax.jcr.AccessDeniedException;
 import javax.jcr.PathNotFoundException;
 import javax.jcr.RepositoryException;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.jahia.services.render.RenderException;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +61,8 @@ public class MaintenancePerSiteFilterTest {
     private JCRPropertyWrapper maintenanceProperty;
     @Mock
     private HttpServletResponse response;
+    @Mock
+    private HttpServletRequest request;
 
     private MaintenancePerSiteFilter filter;
     private AutoCloseable mocks;
@@ -254,6 +258,7 @@ public class MaintenancePerSiteFilterTest {
     public void renderMaintenancePage_rendersItAsMainResourceThenRestoresPrevious() throws Exception {
         Resource previousMain = resource;
         when(renderContext.getMainResource()).thenReturn(previousMain);
+        when(renderContext.getRequest()).thenReturn(request);
         when(resource.getTemplateType()).thenReturn("html");
         doReturn(MAINTENANCE_HTML).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
 
@@ -269,9 +274,32 @@ public class MaintenancePerSiteFilterTest {
     }
 
     @Test
+    public void renderMaintenancePage_startsFromACleanTemplateStateThenRestoresIt() throws Exception {
+        when(renderContext.getMainResource()).thenReturn(resource);
+        when(renderContext.getRequest()).thenReturn(request);
+        when(resource.getTemplateType()).thenReturn("html");
+        // Left by the page's own render: TemplateNodeFilter skips template resolution while it is set,
+        // so the maintenance page would render without its page template, i.e. an empty body.
+        when(request.getAttribute("templateSet")).thenReturn(Boolean.TRUE);
+        doReturn(MAINTENANCE_HTML).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
+
+        filter.renderMaintenancePage(maintenancePage, renderContext, resource);
+
+        InOrder order = inOrder(request, filter);
+        order.verify(request).removeAttribute("templateSet");
+        order.verify(filter).renderResource(any(Resource.class), any(RenderContext.class));
+        order.verify(request).setAttribute("templateSet", Boolean.TRUE);
+        // Unset before the render: cleared again afterwards, dropping what the nested render left.
+        verify(request, times(2)).removeAttribute("previousTemplate");
+        verify(request, never()).setAttribute(org.mockito.ArgumentMatchers.eq("previousTemplate"), any());
+    }
+
+    @Test
     public void renderMaintenancePage_restoresPreviousMainResourceWhenRenderFails() throws Exception {
         Resource previousMain = resource;
         when(renderContext.getMainResource()).thenReturn(previousMain);
+        when(renderContext.getRequest()).thenReturn(request);
+        when(request.getAttribute("templateSet")).thenReturn(Boolean.TRUE);
         when(resource.getTemplateType()).thenReturn("html");
         doThrow(new RenderException("no view")).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
 
@@ -283,6 +311,7 @@ public class MaintenancePerSiteFilterTest {
         }
 
         verify(renderContext).setMainResource(previousMain);
+        verify(request).setAttribute("templateSet", Boolean.TRUE);
     }
 
     @Test
