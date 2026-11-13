@@ -25,7 +25,9 @@ describe('Maintenance per site', () => {
             primaryNodeType: 'jnt:page',
             properties: [
                 { name: 'jcr:title', value: MAINTENANCE_PAGE_TITLE, language: 'en' },
-                { name: 'j:templateName', value: 'default' },
+                // dx-base-demo-templates has no 'default' page template: with it the page renders as a 404,
+                // so the 503 body was empty whatever the module did.
+                { name: 'j:templateName', value: '2-column' },
             ],
         }).then((response) => {
             maintenancePageUuid = response.data.jcr.addNode.uuid
@@ -63,7 +65,10 @@ describe('Maintenance per site', () => {
     })
 
     it('keeps the maintenance page itself reachable (no redirect loop)', () => {
-        cy.request(`/sites/${siteKey}/home/maintenance.html`).its('status').should('eq', 200)
+        cy.request(`/sites/${siteKey}/home/maintenance.html`).then((response) => {
+            expect(response.status).to.eq(200)
+            expect(response.body).to.contain(MAINTENANCE_PAGE_TITLE)
+        })
     })
 
     it('restores normal output once the mixin is removed', () => {
