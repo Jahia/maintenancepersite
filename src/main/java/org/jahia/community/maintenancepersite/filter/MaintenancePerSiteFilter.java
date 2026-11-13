@@ -176,7 +176,22 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
      */
     String renderMaintenancePage(JCRNodeWrapper maintenancePage, RenderContext renderContext, Resource currentResource) throws RenderException {
         Resource maintenanceResource = new Resource(maintenancePage, currentResource.getTemplateType(), null, Resource.CONFIGURATION_PAGE);
-        return RenderService.getInstance().render(maintenanceResource, renderContext);
+        // Render it as the main resource, the way Jahia renders a page (Render servlet, TemplateHelper):
+        // AggregateCacheFilter resolves cache:include placeholders and strips cache tags only for the main
+        // resource. Rendered as a sub-resource, the result is an empty <!-- cache:include --> placeholder
+        // that nothing aggregates any more, since this filter runs after the page's own aggregation.
+        Resource previousMainResource = renderContext.getMainResource();
+        renderContext.setMainResource(maintenanceResource);
+        try {
+            return renderResource(maintenanceResource, renderContext);
+        } finally {
+            renderContext.setMainResource(previousMainResource);
+        }
+    }
+
+    /** Package-private seam over {@link RenderService} so unit tests can stub the render. */
+    String renderResource(Resource resource, RenderContext renderContext) throws RenderException {
+        return RenderService.getInstance().render(resource, renderContext);
     }
 
 }

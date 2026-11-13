@@ -11,6 +11,7 @@ import org.jahia.services.render.filter.cache.ClientCachePolicy;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -22,10 +23,13 @@ import javax.servlet.http.HttpServletResponse;
 import org.jahia.services.render.RenderException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -244,6 +248,41 @@ public class MaintenancePerSiteFilterTest {
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
         verify(renderContext, never()).computeClientCachePolicy(any());
+    }
+
+    @Test
+    public void renderMaintenancePage_rendersItAsMainResourceThenRestoresPrevious() throws Exception {
+        Resource previousMain = resource;
+        when(renderContext.getMainResource()).thenReturn(previousMain);
+        when(resource.getTemplateType()).thenReturn("html");
+        doReturn(MAINTENANCE_HTML).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
+
+        String result = filter.renderMaintenancePage(maintenancePage, renderContext, resource);
+
+        // AggregateCacheFilter only resolves cache:include placeholders for the main resource: rendered
+        // as a sub-resource, the 503 body would be an empty <!-- cache:include --> tag.
+        assertEquals(MAINTENANCE_HTML, result);
+        InOrder order = inOrder(renderContext, filter);
+        order.verify(renderContext).setMainResource(argThat(r -> r != null && r.getNode() == maintenancePage));
+        order.verify(filter).renderResource(argThat(r -> r.getNode() == maintenancePage), any(RenderContext.class));
+        order.verify(renderContext).setMainResource(previousMain);
+    }
+
+    @Test
+    public void renderMaintenancePage_restoresPreviousMainResourceWhenRenderFails() throws Exception {
+        Resource previousMain = resource;
+        when(renderContext.getMainResource()).thenReturn(previousMain);
+        when(resource.getTemplateType()).thenReturn("html");
+        doThrow(new RenderException("no view")).when(filter).renderResource(any(Resource.class), any(RenderContext.class));
+
+        try {
+            filter.renderMaintenancePage(maintenancePage, renderContext, resource);
+            fail("RenderException expected");
+        } catch (RenderException expected) {
+            // the caller fails open on this exception
+        }
+
+        verify(renderContext).setMainResource(previousMain);
     }
 
     @Test
