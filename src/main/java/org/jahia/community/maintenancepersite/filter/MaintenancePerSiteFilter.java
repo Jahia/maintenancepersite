@@ -15,6 +15,7 @@ import org.jahia.services.render.Resource;
 import org.jahia.services.render.filter.AbstractFilter;
 import org.jahia.services.render.filter.RenderChain;
 import org.jahia.services.render.filter.RenderFilter;
+import org.jahia.services.render.filter.cache.ClientCachePolicy;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -29,6 +30,13 @@ import org.slf4j.LoggerFactory;
  * search engines and uptime monitors from treating the site as healthy while it is down, and the
  * {@code no-store} cache headers ensure the maintenance state is not pinned by an HTML/CDN cache once
  * the mixin is removed.</p>
+ *
+ * <p>On Jahia 8.2.1+ the client-cache-control bundle owns {@code Cache-Control} on rendered pages: its
+ * servlet filter makes the header read-only in strict mode, and its render filter rewrites it at the end
+ * of the render chain from {@link RenderContext#getClientCachePolicy()}. Setting the header alone is
+ * therefore discarded (the page's fragments can yield {@code public, ..., s-maxage=3600}), so the filter
+ * also raises the render context policy to {@link ClientCachePolicy#PRIVATE}, the strongest level, which
+ * maps to the {@code private, no-cache, no-store, ...} template and cannot be lowered afterwards.</p>
  *
  * <p>The filter fails open: any misconfiguration (missing or dangling {@code maintenancePage}
  * reference), repository/ACL error while resolving the site, or failure rendering the maintenance
@@ -108,6 +116,11 @@ public class MaintenancePerSiteFilter extends AbstractFilter {
                     maintenancePage.getPath(), site.getName(), e);
             return output;
         }
+
+        // The maintenance body must never be stored by a shared cache. Jahia's client-cache-control
+        // render filter turns this policy into the final Cache-Control header (see the class javadoc);
+        // done before the isCommitted() check because the body is served on that path too.
+        renderContext.computeClientCachePolicy(ClientCachePolicy.PRIVATE);
 
         // Stamp the 503 only after a successful render, so a render failure leaves the normal 200
         // output untouched. Guarded by isCommitted() in case a nested filter already flushed the response.

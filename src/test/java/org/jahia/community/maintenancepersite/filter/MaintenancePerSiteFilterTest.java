@@ -7,6 +7,7 @@ import org.jahia.services.content.decorator.JCRSiteNode;
 import org.jahia.services.render.RenderContext;
 import org.jahia.services.render.Resource;
 import org.jahia.services.render.filter.RenderChain;
+import org.jahia.services.render.filter.cache.ClientCachePolicy;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -100,6 +101,9 @@ public class MaintenancePerSiteFilterTest {
         verify(response).setHeader("Retry-After", String.valueOf(MaintenancePerSiteFilter.RETRY_AFTER_SECONDS));
         verify(response).setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         verify(response).setHeader("Pragma", "no-cache");
+        // Jahia's client-cache-control rewrites Cache-Control from the render context policy, so the
+        // module must raise that policy too: PRIVATE maps to the "private, no-cache, no-store, ..." template.
+        verify(renderContext).computeClientCachePolicy(ClientCachePolicy.PRIVATE);
     }
 
     @Test
@@ -115,6 +119,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(renderContext, never()).getResponse();
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -130,6 +135,7 @@ public class MaintenancePerSiteFilterTest {
 
         assertEquals(MAINTENANCE_HTML, result);
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext).computeClientCachePolicy(ClientCachePolicy.PRIVATE);
     }
 
     @Test
@@ -143,6 +149,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -156,6 +163,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -167,6 +175,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -178,6 +187,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -190,6 +200,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -203,6 +214,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -216,6 +228,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
@@ -230,6 +243,7 @@ public class MaintenancePerSiteFilterTest {
         assertEquals(PREVIOUS_OUT, result);
         verify(filter, never()).renderMaintenancePage(any(), any(), any());
         verify(response, never()).setStatus(anyInt());
+        verify(renderContext, never()).computeClientCachePolicy(any());
     }
 
     @Test
