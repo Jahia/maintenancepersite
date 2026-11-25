@@ -57,7 +57,7 @@
     <groupId>org.jahia.community</groupId>
     <artifactId>maintenancepersite</artifactId>
     <name>maintenancePerSite</name>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.1.0</version>
     <packaging>bundle</packaging>
     <description>This module allows you to activate a maintenance page per web project</description>
 
